@@ -1,48 +1,29 @@
+import numpy as np
 from itertools import combinations
 
-# Function to calculate support for an itemset
+# Calculate support for an itemset
 def calculate_support(dataset, itemset):
-    count = 0
-    for transaction in dataset:
-        if itemset.issubset(transaction):
-            count += 1
-    return count
+    return sum(1 for transaction in dataset if itemset.issubset(transaction))
 
-# Function to generate candidate itemsets
+# Generate candidate itemsets of a specific length
 def generate_candidates(prev_freq_itemsets, length):
-    candidates = set()
-    prev_freq_itemsets = list(prev_freq_itemsets)
-    for i in range(len(prev_freq_itemsets)):
-        for j in range(i + 1, len(prev_freq_itemsets)):
-            # Generate combinations of frequent itemsets
-            union_set = prev_freq_itemsets[i].union(prev_freq_itemsets[j])
-            if len(union_set) == length:
-                candidates.add(frozenset(union_set))
-    return candidates
+    return {frozenset(i | j) for i in prev_freq_itemsets for j in prev_freq_itemsets if len(i | j) == length}
 
 # Apriori Algorithm
-def apriori_algorithm(dataset, min_support):
-    dataset = list(map(set, dataset))  # Convert each transaction into a set
+def apriori(dataset, min_support):
+    dataset = list(map(set, dataset))
+    # Step 1: Find frequent 1-itemsets
     items = {frozenset([item]) for transaction in dataset for item in transaction}
-    
-    # Step 1: Generate frequent 1-itemsets
     freq_itemsets = {item for item in items if calculate_support(dataset, item) >= min_support}
-    all_freq_itemsets = [freq_itemsets]  # To store all levels of frequent itemsets
-    supports = {}  # To store the support of each itemset
-
-    # Store the support of 1-itemsets
-    for itemset in freq_itemsets:
-        supports[itemset] = calculate_support(dataset, itemset)
+    all_freq_itemsets = [freq_itemsets]
+    supports = {item: calculate_support(dataset, item) for item in freq_itemsets}
     
-    # Step 2: Generate larger itemsets until no more frequent itemsets can be generated
-    k = 2  # Length of itemsets to generate
+    # Step 2: Generate larger itemsets
+    k = 2
     while freq_itemsets:
         candidates = generate_candidates(freq_itemsets, k)
-        freq_itemsets = {itemset for itemset in candidates if calculate_support(dataset, itemset) >= min_support}
-        
-        # Store the support of k-itemsets
-        for itemset in freq_itemsets:
-            supports[itemset] = calculate_support(dataset, itemset)
+        freq_itemsets = {item for item in candidates if calculate_support(dataset, item) >= min_support}
+        supports.update({item: calculate_support(dataset, item) for item in freq_itemsets})
         
         if freq_itemsets:
             all_freq_itemsets.append(freq_itemsets)
@@ -50,58 +31,44 @@ def apriori_algorithm(dataset, min_support):
     
     return all_freq_itemsets, supports
 
-# Function to generate association rules from the last frequent itemset
-def generate_association_rules_from_last(freq_itemsets, dataset, supports, min_confidence):
+# Generate association rules from the last frequent itemset level
+def generate_rules(freq_itemsets, supports, min_confidence):
     rules = []
-    last_level = freq_itemsets[-1]  # Get the last frequent itemset level
-    for itemset in last_level:
+    for itemset in freq_itemsets[-1]:
         for i in range(1, len(itemset)):
-            subsets = map(frozenset, combinations(itemset, i))
-            for subset in subsets:
-                confidence = supports[itemset] / supports[subset]
+            for antecedent in map(frozenset, combinations(itemset, i)):
+                consequent = itemset - antecedent
+                confidence = supports[itemset] / supports[antecedent]
                 if confidence >= min_confidence:
-                    rules.append((subset, itemset - subset, supports[itemset], confidence))
+                    rules.append((antecedent, consequent, supports[itemset], confidence))
     return rules
 
 # Example Usage
 if __name__ == "__main__":
-    # Dataset
-    dataset = [
-         {1, 2, 4},
-        {2, 3, 5},
-        {1, 2, 3, 5},
-        {2, 5}
-
-    ]
+    # Dataset and user input
+    dataset = [{1, 2, 4}, {2, 3, 5}, {1, 2, 3, 5}, {2, 5}]
+    min_support_percent = float(input("Enter minimum support percentage: "))
+    min_confidence_percent = float(input("Enter minimum confidence percentage: "))
     
-    # Get user input for min_support and min_confidence in percentage
-    total_transactions = len(dataset)
-    min_support_percentage = float(input("Enter minimum support percentage (e.g., 50 for 50%): "))
-    min_confidence_percentage = float(input("Enter minimum confidence percentage (e.g., 50 for 50%): "))
+    # Calculate minimum support and confidence
+    min_support = (min_support_percent / 100) * len(dataset)
+    min_confidence = min_confidence_percent / 100
     
-    # Calculate min_support and min_confidence based on user input
-    min_support = (min_support_percentage / 100) * total_transactions
-    min_confidence = min_confidence_percentage / 100  # Convert to decimal
-
-    # Run Apriori Algorithm
-    freq_itemsets, supports = apriori_algorithm(dataset, min_support)
+    # Run Apriori algorithm
+    freq_itemsets, supports = apriori(dataset, min_support)
     
-    # Output frequent itemsets with their support
-    print("Frequent Itemsets with Support:")
-    for i, level in enumerate(freq_itemsets, start=1):
-        print(f"\nIteration {i}:")
-        for itemset in level:
+    # Print frequent itemsets with their support
+    print("Frequent Itemsets:")
+    for level, itemsets in enumerate(freq_itemsets, 1):
+        print(f"\nLevel {level}:")
+        for itemset in itemsets:
             print(f"{set(itemset)}: Support = {supports[itemset]}")
     
-    # Generate association rules only from the last frequent itemset
-    rules = generate_association_rules_from_last(freq_itemsets, dataset, supports, min_confidence)
-
-    # Output association rules
+    # Generate and print association rules from the last level
+    rules = generate_rules(freq_itemsets, supports, min_confidence)
     if rules:
-        print("\nAssociation Rules from Last Frequent Itemset:")
-        for rule in rules:
-            antecedent, consequent, support, confidence = rule
-            confidence_percentage = confidence * 100
-            print(f"{set(antecedent)} => {set(consequent)}: Support = {support}, Confidence = {confidence:.2f} ({confidence_percentage:.2f}%)")
+        print("\nAssociation Rules:")
+        for antecedent, consequent, support, confidence in rules:
+            print(f"{set(antecedent)} => {set(consequent)}: Support = {support}, Confidence = {confidence:.2%}")
     else:
-        print("\nNo association rules to be generated.")
+        print("\nNo association rules generated.")

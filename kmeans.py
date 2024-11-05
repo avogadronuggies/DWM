@@ -9,8 +9,6 @@ data = [
         [6,4]  
     ]
 
-
-
 # function to calculate the euclidean distance
 
 def euclidean_distance(x1,y1,x2,y2):
@@ -36,8 +34,12 @@ while count < len(data):
             cluster2.append(point)
         print("centroid value",c1,c2)
         print(" cluster1 ",cluster1,"cluster2 ",cluster2)
-    c1 = [sum([x[0] for x in cluster1])/len(cluster1),sum([x[1] for x in cluster1])/len(cluster1)]
-    c2 = [sum([x[0] for x in cluster2])/len(cluster2),sum([x[1] for x in cluster2])/len(cluster2)]
+        
+    if cluster1:
+        c1 = [sum([x[0] for x in cluster1])/len(cluster1),sum([x[1] for x in cluster1])/len(cluster1)]
+        
+    if cluster2:
+        c2 = [sum([x[0] for x in cluster2])/len(cluster2),sum([x[1] for x in cluster2])/len(cluster2)]
     
    
 
